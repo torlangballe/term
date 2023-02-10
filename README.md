@@ -1,3 +1,5 @@
+This is a for of https://github.com/golang/term (was/is golang.org/x/term also), to provide inputing a line of text without it being a command.
+
 # Go terminal/console support
 
 [![Go Reference](https://pkg.go.dev/badge/golang.org/x/term.svg)](https://pkg.go.dev/golang.org/x/term)
