@@ -700,7 +700,7 @@ func (t *Terminal) ReadPassword(prompt string) (line string, err error) {
 	t.prompt = []rune(prompt)
 	t.echo = false
 
-	line, err = t.readLine()
+	line, err = t.readLine(false)
 
 	t.prompt = oldPrompt
 	t.echo = true
@@ -712,11 +712,20 @@ func (t *Terminal) ReadPassword(prompt string) (line string, err error) {
 func (t *Terminal) ReadLine() (line string, err error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
-
-	return t.readLine()
+	return t.readLine(true)
 }
 
-func (t *Terminal) readLine() (line string, err error) {
+func (t *Terminal) ReadValueLine() (line string, err error) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	oldPrompt := t.prompt
+	t.prompt = []rune{}
+	line, err = t.readLine(false)
+	t.prompt = oldPrompt
+	return
+}
+
+func (t *Terminal) readLine(addToHistory bool) (line string, err error) {
 	// t.lock must be held at this point
 
 	if t.cursorX == 0 && t.cursorY == 0 {
@@ -726,23 +735,28 @@ func (t *Terminal) readLine() (line string, err error) {
 	}
 
 	lineIsPasted := t.pasteActive
-
 	for {
 		rest := t.remainder
 		lineOk := false
 		for !lineOk {
 			var key rune
 			key, rest = bytesToKey(rest, t.pasteActive)
+			if key == 4 { // control-d
+				return "", io.EOF
+			}
 			if key == utf8.RuneError {
 				break
 			}
 			if !t.pasteActive {
+				// zlog.Info("KEY:", key, key == keyCtrlD, len(t.line))
 				if key == keyCtrlD {
 					if len(t.line) == 0 {
+						t.remainder = []byte{}
 						return "", io.EOF
 					}
 				}
 				if key == keyCtrlC {
+					t.remainder = []byte{}
 					return "", io.EOF
 				}
 				if key == keyPasteStart {
@@ -770,9 +784,14 @@ func (t *Terminal) readLine() (line string, err error) {
 		t.c.Write(t.outBuf)
 		t.outBuf = t.outBuf[:0]
 		if lineOk {
-			if t.echo {
-				t.historyIndex = -1
-				t.history.Add(line)
+			if t.echo && addToHistory {
+				if line != "" {
+					entry, ok := t.history.NthPreviousEntry(t.historyIndex + 1)
+					if !ok || entry != line {
+						t.historyIndex = -1
+						t.history.Add(line)
+					}
+				}
 			}
 			if lineIsPasted {
 				err = ErrPasteIndicator
