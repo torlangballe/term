@@ -569,6 +569,7 @@ func (t *Terminal) handleKey(key rune) (line string, ok bool) {
 			newLine, newPos, completeOk := t.AutoCompleteCallback(prefix+suffix, len(prefix), key)
 			t.lock.Lock()
 
+			// fmt.Println("AutoComp:", prefix, suffix, key, completeOk, newLine)
 			if completeOk {
 				t.setLine([]rune(newLine), utf8.RuneCount([]byte(newLine)[:newPos]))
 				return
